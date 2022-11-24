@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
 )
 
 // Mutfs is a loopback FS node disallowing unlinks.
@@ -31,9 +32,36 @@ var (
 	_ = (fs.NodeRenamer)((*MutNode)(nil))
 )
 
-func (n *MutNode) Unlink(_ context.Context, _ string) syscall.Errno { return syscall.EACCES }
-func (n *MutNode) Rename(_ context.Context, _ string, _ fs.InodeEmbedder, _ string, _ uint32) syscall.Errno {
+func deny(ctx context.Context, name string) syscall.Errno {
+	caller, ok := fuse.FromContext(ctx)
+	if !ok {
+		return syscall.EACCES
+	}
+	if name != "" {
+		log.Printf("Write access denied to %q from pid %d, from %d/%d", name, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
+	} else {
+		log.Printf("Write access denied from pid %d, from %d/%d", caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
+	}
 	return syscall.EACCES
+}
+
+func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno   { return deny(ctx, name) }
+func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno    { return deny(ctx, name) }
+func (n *MutNode) Removexattr(ctx context.Context, _ string) syscall.Errno { return deny(ctx, "") }
+func (n *MutNode) Setxattr(ctx context.Context, _ string, _ []byte) (uint32, syscall.Errno) {
+	return 0, deny(ctx, "")
+}
+
+func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, _ *fuse.SetAttrIn, _ *fuse.AttrOut) syscall.Errno {
+	return deny(ctx, "")
+}
+
+func (n *MutNode) Rename(ctx context.Context, name string, _ fs.InodeEmbedder, _ string, _ uint32) syscall.Errno {
+	return deny(ctx, name)
+}
+
+func (n *MutNode) Setlkw(ctx context.Context, _ fs.FileHandle, _ uint64, _ *fuse.FileLock, _ uint32) syscall.Errno {
+	return deny(ctx, "")
 }
 
 func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
