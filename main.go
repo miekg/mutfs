@@ -101,6 +101,7 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 var flagOpts sliceFlag
 
 func main() {
+	flagOpts.Data = &[]string{}
 	flag.Var(&flagOpts, "o", "options (debug)")
 	flag.Parse()
 	if flag.NArg() < 2 {

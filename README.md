@@ -35,3 +35,15 @@ Synopsis
 Where options is a comma seperated list, currently supported:
 
 * `debug`: enable debug logging
+
+fstab
+------
+
+Using `mount -t fuse.mutfs ~ /tmp/mutmiek -o debug` will use mutfs (*if* the executable can be found
+in the path) to mount ~ under /tmp/mutmiek (and that dir needs to exist as well).
+
+TODO
+====
+
+The -o option is done last if following the mount spec. We need different flag lib to make that
+happen.
