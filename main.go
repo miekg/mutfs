@@ -101,7 +101,7 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 var flagOpts sliceFlag
 
 func main() {
-	flag.Var(&flagOpts, "o", "mount options, comma seperated")
+	flag.Var(&flagOpts, "o", "options (debug)")
 	flag.Parse()
 	if flag.NArg() < 2 {
 		fmt.Printf("usage: %s oldir newdir\n", path.Base(os.Args[0]))
