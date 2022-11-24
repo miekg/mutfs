@@ -1,10 +1,9 @@
 // Copyright 2020 the Go-FUSE Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 // Adapted by Miek Gieben to become mutfs.
 
-// This is main program driver for a loopback filesystem that disallows unlinks.
+// This is main program driver for a loopback filesystem that disallows destructive actions.
 package main
 
 import (
@@ -21,7 +20,7 @@ import (
 	"github.com/hanwen/go-fuse/v2/fuse"
 )
 
-// Mutfs is a loopback FS node disallowing unlinks.
+// Mutfs is a loopback FS node disallowing destructive actions.
 type MutNode struct {
 	fs.LoopbackNode
 }
@@ -85,7 +84,7 @@ func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32
 		return nil, 0, syscall.EACCES
 	}
 
-	// I don't know what 0x8000 is syscall.O_* doesn't have such a value...
+	// I don't know what 0x8000 is, syscall.O_* doesn't have such a value...
 	flags = flags &^ 0x8000
 
 	if flags == syscall.O_RDONLY {
@@ -130,6 +129,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}
-	fmt.Println("Mounted!")
 	server.Wait()
 }
