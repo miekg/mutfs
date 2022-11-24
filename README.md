@@ -12,15 +12,17 @@ perform the deletes.
 Example
 -------
 
-Mount your homedirectory: `/mutfs /tmp/mutmiek ~`
+Mount your homedirectory: `/mutfs /tmp/mut$USER ~`
 
 Then:
 
 ~~~ sh
 % cd /tmp/mutmiek
-% ls -l x.md
--rw-rw-r-- 1 miek miek 26 okt 26 11:21 x.md
-% cp x.md y.md
-% rm y.md
-
+% echo 1 > a
+% cat a
+1
+% echo 2 > a
+zsh: permission denied: a
+% rm a
+rm: cannot remove 'a': Permission denied
 ~~~~
