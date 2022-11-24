@@ -1,0 +1,12 @@
+[Unit]
+Description=Immutable Filesystem
+After=network.target
+
+[Mount]
+What=bucket-name
+Where=/path/to/dir
+Type=fuse.mutfs
+#Options=debug
+
+[Install]
+WantedBy=multi-user.target

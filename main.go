@@ -98,21 +98,22 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 	return &MutNode{fs.LoopbackNode{RootData: rootData}}
 }
 
+var flagOpts sliceFlag
+
 func main() {
-	log.SetFlags(log.Lmicroseconds)
-	debug := flag.Bool("debug", false, "print debugging messages.")
+	flag.Var(&flagOpts, "o", "mount options, comma seperated")
 	flag.Parse()
 	if flag.NArg() < 2 {
-		fmt.Printf("usage: %s MOUNTPOINT ORIGINAL\n", path.Base(os.Args[0]))
+		fmt.Printf("usage: %s oldir newdir\n", path.Base(os.Args[0]))
 		fmt.Printf("\noptions:\n")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
 
-	orig := flag.Arg(1)
+	olddir := flag.Arg(0)
 	rootData := &fs.LoopbackRoot{
 		NewNode: New,
-		Path:    orig,
+		Path:    olddir,
 	}
 
 	sec := time.Second
@@ -120,12 +121,18 @@ func main() {
 		AttrTimeout:  &sec,
 		EntryTimeout: &sec,
 	}
-	opts.Debug = *debug
-	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+orig)
+	for _, o := range *flagOpts.Data {
+		switch o {
+		case "debug":
+			opts.Debug = true
+		}
+	}
+	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+olddir)
 	opts.MountOptions.Name = "mutfs"
 	opts.NullPermissions = true
 
-	server, err := fs.Mount(flag.Arg(0), New(rootData, nil, "", nil), opts)
+	log.SetFlags(log.Lmicroseconds)
+	server, err := fs.Mount(flag.Arg(1), New(rootData, nil, "", nil), opts)
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}

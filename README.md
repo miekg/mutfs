@@ -12,7 +12,7 @@ perform the deletes.
 Example
 -------
 
-Mount your homedirectory: `/mutfs /tmp/mut$USER ~`
+Mount your homedirectory: `/mutfs ~ /tmp/mut$USER`
 
 Then:
 
@@ -26,3 +26,12 @@ zsh: permission denied: a
 % rm a
 rm: cannot remove 'a': Permission denied
 ~~~~
+
+Synopsis
+--------
+
+`mutfs -o <option> olddir newdir`
+
+Where options is a comma seperated list, currently supported:
+
+* `debug`: enable debug logging
