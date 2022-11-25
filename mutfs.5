@@ -32,8 +32,7 @@ Where options is a comma seperated list, currently supported:
 
 .PP
 Using \fB\fCmount -t mutfs ~ /tmp/mut -o debug\fR will use mutfs (\fIif\fP the executable (\fB\fCmount.mutfs\fR) can
-be found in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR. Note that this "hangs" for as long the mount point
-is mounted. Use the mutfs.sh shell script to make mutfs background.
+be found in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR.
 
 .PP
 Or you can install the following systemd mount unit:
@@ -50,7 +49,7 @@ After=network.target
 What=<olddir>
 Where=<newdir>
 Type=mutfs
-Options=debug
+Options=debug,allow\_other
 
 [Install]
 WantedBy=multi\-user.target

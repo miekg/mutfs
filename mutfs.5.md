@@ -29,8 +29,7 @@ Where options is a comma seperated list, currently supported:
 * `log`: enable logging when a destructive action is tried.
 
 Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
-be found in the path) to mount `~` under `/tmp`. Note that this "hangs" for as long the mount point
-is mounted. Use the mutfs.sh shell script to make mutfs background.
+be found in the path) to mount `~` under `/tmp`.
 
 Or you can install the following systemd mount unit:
 
@@ -43,7 +42,7 @@ After=network.target
 What=<olddir>
 Where=<newdir>
 Type=mutfs
-Options=debug
+Options=debug,allow_other
 
 [Install]
 WantedBy=multi-user.target
