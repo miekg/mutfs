@@ -25,8 +25,9 @@ Where options is a comma seperated list, currently supported:
 
 
 .PP
-Using \fB\fCmount -t fuse.mutfs ~ /tmp/mut -o debug\fR will use mutfs (\fIif\fP the executable can be found
-in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR.
+Using \fB\fCmount -t mutfs ~ /tmp/mut -o debug\fR will use mutfs (\fIif\fP the executable (\fB\fCmount.mutfs\fR) can
+be found in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR. Note that this "hangs" for as long the mount point
+is mounted. Use the mutfs.sh shell script to make mutfs background.
 
 .PP
 Or you can install the following systemd mount unit:
@@ -42,7 +43,7 @@ After=network.target
 [Mount]
 What=<olddir>
 Where=<newdir>
-Type=fuse.mutfs
+Type=mutfs
 Options=debug
 
 [Install]
@@ -50,6 +51,22 @@ WantedBy=multi\-user.target
 
 .fi
 .RE
+
+.SH "INSTALL"
+.PP
+Copy mutfs and mount.mutfs to /usr/sbin. And potentially add a line to /etc/fstab;
+
+.PP
+.RS
+
+.nf
+/home/miek    /tmp/mut         mutfs     log,nouser   0 0
+
+.fi
+.RE
+
+.PP
+And adjust as needed.
 
 .SH "EXAMPLES"
 .PP
