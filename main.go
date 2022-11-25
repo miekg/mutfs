@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
+	flag "github.com/spf13/pflag"
 )
 
 // Mutfs is a loopback FS node disallowing destructive actions.
@@ -98,11 +98,10 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 	return &MutNode{fs.LoopbackNode{RootData: rootData}}
 }
 
-var flagOpts sliceFlag
+var flagOpts *[]string
 
 func main() {
-	flagOpts.Data = &[]string{}
-	flag.Var(&flagOpts, "o", "options (debug)")
+	flagOpts = flag.StringSliceP("opt", "o", nil, "options (debug)")
 	flag.Parse()
 	if flag.NArg() < 2 {
 		fmt.Printf("usage: %s oldir newdir\n", path.Base(os.Args[0]))
@@ -122,7 +121,7 @@ func main() {
 		AttrTimeout:  &sec,
 		EntryTimeout: &sec,
 	}
-	for _, o := range *flagOpts.Data {
+	for _, o := range *flagOpts {
 		switch o {
 		case "debug":
 			opts.Debug = true

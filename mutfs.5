@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- name="GENERATOR" content="github.com/mmarkdown/mmark Mmark Markdown Processor - mmark.miek.nl" -->
+
+<section anchor="mutfs"><name>mutfs</name>
+
+<section anchor="name"><name>Name</name>
+<t>mutfs - immutable file system</t>
+</section>
+
+<section anchor="synopsis"><name>Synopsis</name>
+<t><tt>mutfs [OPTION]...</tt> <em>olddir</em> <em>newdir</em></t>
+</section>
+
+<section anchor="description"><name>Description</name>
+<t>Mutfs is used as an overlay file system to make it immutable, write actions are only allowed when
+creating a new file. Once things exists, they can't be changed or deleted.</t>
+<t>Where options is a comma seperated list, currently supported:</t>
+
+<ul spacing="compact">
+<li><tt>debug</tt>: enable debug logging</li>
+</ul>
+<t>Using <tt>mount -t fuse.mutfs ~ /tmp/mut -o debug</tt> will use mutfs (<em>if</em> the executable can be found
+in the path) to mount <tt>~</tt> under <tt>/tmp</tt>.</t>
+</section>
+
+<section anchor="examples"><name>Examples</name>
+<t>For example mount your home directory on a directory in <tt>/tmp</tt>: <tt>/mutfs ~ /tmp/mut</tt>, then you can
+create the file <tt>a</tt>, but we can't update it after it's creation:</t>
+<t>~~~ sh
+% cd /tmp/mut
+% echo 1 &gt; a
+% cat a
+1
+% echo 2 &gt; a
+zsh: permission denied: a
+% rm a
+rm: cannot remove 'a': Permission denied
+~~~~</t>
+</section>
+
+<section anchor="author"><name>Author</name>
+<t>Miek Gieben <eref target="mailto:miek@miek.nl">miek@miek.nl</eref>.</t>
+</section>
+</section>
+
