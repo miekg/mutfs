@@ -18,7 +18,9 @@ mutfs - immutable file system
 ## Description
 
 Mutfs is used as an overlay file system to make it immutable, write actions are only allowed when
-creating a new file. Once things exists, they can't be changed or deleted.
+creating a new file. Once things exists, they can't be changed or deleted. A use-case might be to
+protect an backed up archive from a ransomware attack. The attack will still happen, but at least it
+can't delete the old files (nor the encrypted ones once created).
 
 Where options is a comma seperated list, currently supported:
 
