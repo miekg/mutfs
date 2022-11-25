@@ -23,6 +23,10 @@ Where options is a comma seperated list, currently supported:
 .IP \(bu 4
 \fB\fCnull\fR: change \fInull\fP permissions to 0644 (files), 0755 (dirs).
 .IP \(bu 4
+\fB\fCallow_other\fR: everyone can access the files.
+.IP \(bu 4
+\fB\fCro\fR: make fully read-only.
+.IP \(bu 4
 \fB\fClog\fR: enable logging when a destructive action is tried.
 
 
@@ -62,13 +66,18 @@ Copy mutfs and mount.mutfs to /usr/sbin. And potentially add a line to /etc/fsta
 .RS
 
 .nf
-/home/miek    /tmp/mut         mutfs     log,nouser   0 0
+/home/miek    /tmp/mut         mutfs     log,nouser,allow\_other   0 0
 
 .fi
 .RE
 
 .PP
 And adjust as needed.
+
+.PP
+Re-exporting the filesystem only works if \fB\fCallow_other\fR is specifed, otherwise the SMB/NFS daemon
+cannot access the filesystem because only the user mounting it has access. Note unless you edit
+\fB\fC/etc/fuse.conf\fR only root can create mounts with this option specified.
 
 .SH "EXAMPLES"
 .PP
@@ -90,6 +99,10 @@ rm: cannot remove 'a': Permission denied
 
 .fi
 .RE
+
+.SH "SEE ALSO"
+.PP
+fuse(8)
 
 .SH "AUTHOR"
 .PP

@@ -106,7 +106,7 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 var flagOpts *[]string
 
 func main() {
-	flagOpts = flag.StringSliceP("opt", "o", nil, "options (debug)")
+	flagOpts = flag.StringSliceP("opt", "o", nil, "options [debug,null,allow_other,ro,log]")
 	flag.Parse()
 	if flag.NArg() < 2 {
 		fmt.Printf("usage: %s oldir newdir\n", path.Base(os.Args[0]))
@@ -139,12 +139,16 @@ func main() {
 	}
 
 	for _, o := range *flagOpts {
-		// do ro as well, deny everything?
 		switch o {
 		case "debug":
 			opts.Debug = true
 		case "null":
 			opts.NullPermissions = true
+		case "allow_other":
+			opts.AllowOther = true
+			opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
+		case "ro":
+			opts.MountOptions.Options = append(opts.MountOptions.Options, "ro")
 		case "log":
 			mutnode.(*MutNode).log = true
 		}

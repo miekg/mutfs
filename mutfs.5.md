@@ -24,6 +24,8 @@ Where options is a comma seperated list, currently supported:
 
 * `debug`: enable debug logging.
 * `null`: change *null* permissions to 0644 (files), 0755 (dirs).
+* `allow_other`: everyone can access the files.
+* `ro`: make fully read-only.
 * `log`: enable logging when a destructive action is tried.
 
 Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
@@ -52,10 +54,14 @@ WantedBy=multi-user.target
 Copy mutfs and mount.mutfs to /usr/sbin. And potentially add a line to /etc/fstab;
 
 ~~~ fstab
-/home/miek    /tmp/mut         mutfs     log,nouser   0 0
+/home/miek    /tmp/mut         mutfs     log,nouser,allow_other   0 0
 ~~~
 
 And adjust as needed.
+
+Re-exporting the filesystem only works if `allow_other` is specifed, otherwise the SMB/NFS daemon
+cannot access the filesystem because only the user mounting it has access. Note unless you edit
+`/etc/fuse.conf` only root can create mounts with this option specified.
 
 ## Examples
 
@@ -72,6 +78,10 @@ zsh: permission denied: a
 % rm a
 rm: cannot remove 'a': Permission denied
 ~~~
+
+## See Also
+
+fuse(8)
 
 ## Author
 
