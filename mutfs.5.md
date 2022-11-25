@@ -22,8 +22,9 @@ creating a new file. Once things exists, they can't be changed or deleted.
 
 Where options is a comma seperated list, currently supported:
 
-* `debug`: enable debug logging
+* `debug`: enable debug logging.
 * `null`: change *null* permissions to 0644 (files), 0755 (dirs).
+* `log`: enable logging when a destructive action is tried.
 
 Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
 be found in the path) to mount `~` under `/tmp`. Note that this "hangs" for as long the mount point
