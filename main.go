@@ -116,6 +116,16 @@ func main() {
 	}
 
 	olddir := flag.Arg(0)
+	for _, d := range []string{olddir, flag.Arg(1)} {
+		fi, err := os.Stat(d)
+		if err != nil {
+			log.Fatalf("Can't stat %q: %s", d, err)
+		}
+		if !fi.IsDir() {
+			log.Fatalf("%q isn't a directory", d)
+		}
+	}
+
 	rootData := &fs.LoopbackRoot{
 		NewNode: New,
 		Path:    olddir,
