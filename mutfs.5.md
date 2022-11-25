@@ -26,7 +26,8 @@ Where options is a comma seperated list, currently supported:
 * `null`: change *null* permissions to 0644 (files), 0755 (dirs).
 
 Using `mount -t fuse.mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable can be found
-in the path) to mount `~` under `/tmp`.
+in the path) to mount `~` under `/tmp`. Note that this "hangs" for as long the mount point is
+mounted. Use the mutfs.sh shell script to make mutfs background.
 
 Or you can install the following systemd mount unit:
 
