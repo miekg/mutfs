@@ -22,13 +22,14 @@ creating a new file. Once things exists, they can't be changed or deleted. A use
 protect an backed up archive from a ransomware attack. The attack will still happen, but at least it
 can't delete the old files (nor the encrypted ones once created).
 
-Where options is a comma seperated list, currently supported:
+Options are:
 
-* `debug`: enable debug logging.
-* `null`: change *null* permissions to 0644 (files), 0755 (dirs).
-* `allow_other`: everyone can access the files.
-* `ro`: make fully read-only.
-* `log`: enable logging when a destructive action is tried.
+- `-o opt,...`, where `opt` can be:
+   * `debug`: enable debug logging.
+   * `null`: change *null* permissions to 0644 (files), 0755 (dirs).
+   * `allow_other`: everyone can access the files.
+   * `ro`: make fully read-only.
+   * `log`: enable logging when a destructive action is tried.
 
 Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
 be found in the path) to mount `~` under `/tmp`.

@@ -18,18 +18,24 @@ protect an backed up archive from a ransomware attack. The attack will still hap
 can't delete the old files (nor the encrypted ones once created).
 
 .PP
-Where options is a comma seperated list, currently supported:
+Options are:
 
 .IP \(bu 4
+\fB\fC-o opt,...\fR, where \fB\fCopt\fR can be:
+
+.RS
+.IP \(en 4
 \fB\fCdebug\fR: enable debug logging.
-.IP \(bu 4
+.IP \(en 4
 \fB\fCnull\fR: change \fInull\fP permissions to 0644 (files), 0755 (dirs).
-.IP \(bu 4
+.IP \(en 4
 \fB\fCallow_other\fR: everyone can access the files.
-.IP \(bu 4
+.IP \(en 4
 \fB\fCro\fR: make fully read-only.
-.IP \(bu 4
+.IP \(en 4
 \fB\fClog\fR: enable logging when a destructive action is tried.
+
+.RE
 
 
 .PP
