@@ -23,6 +23,8 @@ import (
 // Mutfs is a loopback FS node disallowing destructive actions.
 type MutNode struct {
 	fs.LoopbackNode
+
+	log bool
 }
 
 var (
@@ -31,7 +33,10 @@ var (
 	_ = (fs.NodeRenamer)((*MutNode)(nil))
 )
 
-func deny(ctx context.Context, name string) syscall.Errno {
+func (n *MutNode) deny(ctx context.Context, name string) syscall.Errno {
+	if !n.log {
+		return syscall.EACCES
+	}
 	caller, ok := fuse.FromContext(ctx)
 	if !ok {
 		return syscall.EACCES
@@ -44,23 +49,23 @@ func deny(ctx context.Context, name string) syscall.Errno {
 	return syscall.EACCES
 }
 
-func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno   { return deny(ctx, name) }
-func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno    { return deny(ctx, name) }
-func (n *MutNode) Removexattr(ctx context.Context, _ string) syscall.Errno { return deny(ctx, "") }
+func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno   { return n.deny(ctx, name) }
+func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno    { return n.deny(ctx, name) }
+func (n *MutNode) Removexattr(ctx context.Context, _ string) syscall.Errno { return n.deny(ctx, "") }
 func (n *MutNode) Setxattr(ctx context.Context, _ string, _ []byte) (uint32, syscall.Errno) {
-	return 0, deny(ctx, "")
+	return 0, n.deny(ctx, "")
 }
 
 func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, _ *fuse.SetAttrIn, _ *fuse.AttrOut) syscall.Errno {
-	return deny(ctx, "")
+	return n.deny(ctx, "")
 }
 
 func (n *MutNode) Rename(ctx context.Context, name string, _ fs.InodeEmbedder, _ string, _ uint32) syscall.Errno {
-	return deny(ctx, name)
+	return n.deny(ctx, name)
 }
 
 func (n *MutNode) Setlkw(ctx context.Context, _ fs.FileHandle, _ uint64, _ *fuse.FileLock, _ uint32) syscall.Errno {
-	return deny(ctx, "")
+	return n.deny(ctx, "")
 }
 
 func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
@@ -95,7 +100,7 @@ func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32
 }
 
 func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs.InodeEmbedder {
-	return &MutNode{fs.LoopbackNode{RootData: rootData}}
+	return &MutNode{LoopbackNode: fs.LoopbackNode{RootData: rootData}}
 }
 
 var flagOpts *[]string
@@ -115,24 +120,30 @@ func main() {
 		NewNode: New,
 		Path:    olddir,
 	}
+	mutnode := New(rootData, nil, "", nil)
 
 	sec := time.Second
 	opts := &fs.Options{
 		AttrTimeout:  &sec,
 		EntryTimeout: &sec,
 	}
+
 	for _, o := range *flagOpts {
+		// do ro as well, deny everything?
 		switch o {
 		case "debug":
 			opts.Debug = true
+		case "null":
+			opts.NullPermissions = true
+		case "log":
+			mutnode.(*MutNode).log = true
 		}
 	}
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+olddir)
 	opts.MountOptions.Name = "mutfs"
-	opts.NullPermissions = true
 
 	log.SetFlags(log.Lmicroseconds)
-	server, err := fs.Mount(flag.Arg(1), New(rootData, nil, "", nil), opts)
+	server, err := fs.Mount(flag.Arg(1), mutnode, opts)
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}
