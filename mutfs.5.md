@@ -9,7 +9,7 @@ mutfs
 
 ## Name
 
-mutfs - immutable file system
+mutfs - immutable file system, with write grace period
 
 ## Synopsis
 
@@ -18,9 +18,10 @@ mutfs - immutable file system
 ## Description
 
 Mutfs is used as an overlay file system to make it immutable, write actions are only allowed when
-creating a new file. Once things exists, they can't be changed or deleted. A use-case might be to
-protect an backed up archive from a ransomware attack. The attack will still happen, but at least it
-can't delete the old files (nor the encrypted ones once created).
+creating a new file (or within a user specific grace period). Once things exists, they can't be
+changed or deleted. A use-case might be to protect an backed up archive from a ransomware attack.
+The attack will still happen, but at least it can't delete the old files (nor the encrypted ones
+once created).
 
 Options are:
 
@@ -30,9 +31,14 @@ Options are:
    * `allow_other`: everyone can access the files.
    * `ro`: make fully read-only.
    * `log`: enable logging when a destructive action is tried.
+   * `grace=`*duration*, given a Go syntax duration will allow write operations for *duration*.
 
-Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
-be found in the path) to mount `~` under `/tmp`.
+Using `mount -t mutfs ~ /tmp/mut -o debug,grace=5s` will use mutfs (*if* the executable
+(`mount.mutfs`) can be found in the path) to mount `~` under `/tmp`. For up to 5 seconds after
+file/directory creation destructive actions are allowed.
+
+Note the grace period works by getting the files creation time via the `statx` system call, which
+the underlying filesystem should support.
 
 Or you can install the following systemd mount unit:
 
@@ -83,7 +89,7 @@ rm: cannot remove 'a': Permission denied
 
 ## See Also
 
-fuse(8)
+fuse(8) stat(2)
 
 ## Author
 
