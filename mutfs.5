@@ -4,7 +4,7 @@
 .SH "MUTFS"
 .SH "NAME"
 .PP
-mutfs - immutable file system
+mutfs - immutable file system, with write grace period
 
 .SH "SYNOPSIS"
 .PP
@@ -13,9 +13,10 @@ mutfs - immutable file system
 .SH "DESCRIPTION"
 .PP
 Mutfs is used as an overlay file system to make it immutable, write actions are only allowed when
-creating a new file. Once things exists, they can't be changed or deleted. A use-case might be to
-protect an backed up archive from a ransomware attack. The attack will still happen, but at least it
-can't delete the old files (nor the encrypted ones once created).
+creating a new file (or within a user specific grace period). Once things exists, they can't be
+changed or deleted. A use-case might be to protect an backed up archive from a ransomware attack.
+The attack will still happen, but at least it can't delete the old files (nor the encrypted ones
+once created).
 
 .PP
 Options are:
@@ -34,13 +35,20 @@ Options are:
 \fB\fCro\fR: make fully read-only.
 .IP \(en 4
 \fB\fClog\fR: enable logging when a destructive action is tried.
+.IP \(en 4
+\fB\fCgrace=\fR\fIduration\fP, given a Go syntax duration will allow write operations for \fIduration\fP.
 
 .RE
 
 
 .PP
-Using \fB\fCmount -t mutfs ~ /tmp/mut -o debug\fR will use mutfs (\fIif\fP the executable (\fB\fCmount.mutfs\fR) can
-be found in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR.
+Using \fB\fCmount -t mutfs ~ /tmp/mut -o debug,grace=5s\fR will use mutfs (\fIif\fP the executable
+(\fB\fCmount.mutfs\fR) can be found in the path) to mount \fB\fC~\fR under \fB\fC/tmp\fR. For up to 5 seconds after
+file/directory creation destructive actions are allowed.
+
+.PP
+Note the grace period works by getting the files creation time via the \fB\fCstatx\fR system call, which
+the underlying filesystem should support.
 
 .PP
 Or you can install the following systemd mount unit:
@@ -109,7 +117,7 @@ rm: cannot remove 'a': Permission denied
 
 .SH "SEE ALSO"
 .PP
-fuse(8)
+fuse(8) stat(2)
 
 .SH "AUTHOR"
 .PP
