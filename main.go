@@ -12,6 +12,8 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,57 +22,98 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-// Mutfs is a loopback FS node disallowing destructive actions.
+// Mutfs is a loopback FS node disallowing destructive actions. Within a user defined grace period actions _are_
+// allowed.
 type MutNode struct {
 	fs.LoopbackNode
-
-	log bool
 }
+
+var (
+	Log   bool
+	Grace time.Duration
+)
 
 var (
 	_ = (fs.NodeOpener)((*MutNode)(nil))
 	_ = (fs.NodeUnlinker)((*MutNode)(nil))
 	_ = (fs.NodeRenamer)((*MutNode)(nil))
+	_ = (fs.NodeSetxattrer)((*MutNode)(nil))
+	_ = (fs.NodeSetattrer)((*MutNode)(nil))
+	_ = (fs.NodeRmdirer)((*MutNode)(nil))
+	_ = (fs.NodeRemovexattrer)((*MutNode)(nil))
 )
 
 func (n *MutNode) deny(ctx context.Context, name string) syscall.Errno {
-	if !n.log {
+	actualPath := filepath.Join(n.LoopbackNode.RootData.Path, filepath.Join(n.LoopbackNode.Path(n.LoopbackNode.Root()), name))
+	caller, _ := fuse.FromContext(ctx)
+	if bt, err := btime(actualPath); err == nil { // on success
+		if since := time.Since(bt); since < Grace {
+			if !Log {
+				return fs.OK
+			}
+			log.Printf("Access granted to %q because of grace: %s, from pid %d and %d%d", actualPath, Grace-since, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
+			return fs.OK
+		}
+	}
+
+	if !Log {
 		return syscall.EACCES
 	}
-	caller, ok := fuse.FromContext(ctx)
-	if !ok {
-		return syscall.EACCES
-	}
-	if name != "" {
-		log.Printf("Write access denied to %q from pid %d, from %d/%d", name, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
-	} else {
-		log.Printf("Write access denied from pid %d, from %d/%d", caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
-	}
+	log.Printf("Write access denied to %q from pid %d, from %d/%d", actualPath, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
 	return syscall.EACCES
 }
 
-func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno   { return n.deny(ctx, name) }
-func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno    { return n.deny(ctx, name) }
-func (n *MutNode) Removexattr(ctx context.Context, _ string) syscall.Errno { return n.deny(ctx, "") }
-func (n *MutNode) Setxattr(ctx context.Context, _ string, _ []byte) (uint32, syscall.Errno) {
-	return 0, n.deny(ctx, "")
+func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno {
+	errno := n.deny(ctx, name)
+	if errno != fs.OK {
+		return errno
+	}
+	return n.LoopbackNode.Unlink(ctx, name)
 }
 
-func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, _ *fuse.SetAttrIn, _ *fuse.AttrOut) syscall.Errno {
-	return n.deny(ctx, "")
+func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno {
+	errno := n.deny(ctx, name)
+	if errno != fs.OK {
+		return errno
+	}
+	return n.LoopbackNode.Rmdir(ctx, name)
 }
 
-func (n *MutNode) Rename(ctx context.Context, name string, _ fs.InodeEmbedder, _ string, _ uint32) syscall.Errno {
-	return n.deny(ctx, name)
+func (n *MutNode) Removexattr(ctx context.Context, attr string) syscall.Errno {
+	errno := n.deny(ctx, "")
+	if errno != fs.OK {
+		return errno
+	}
+	return n.LoopbackNode.Removexattr(ctx, attr)
 }
 
-func (n *MutNode) Setlkw(ctx context.Context, _ fs.FileHandle, _ uint64, _ *fuse.FileLock, _ uint32) syscall.Errno {
-	return n.deny(ctx, "")
+func (n *MutNode) Setxattr(ctx context.Context, attr string, data []byte, flags uint32) syscall.Errno {
+	errno := n.deny(ctx, "")
+	if errno != fs.OK {
+		return errno
+	}
+	return n.LoopbackNode.Setxattr(ctx, attr, data, flags)
+}
+
+func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
+	errno := n.deny(ctx, "")
+	if errno != fs.OK {
+		return errno
+	}
+	return n.LoopbackNode.Setattr(ctx, f, in, out)
+}
+
+func (n *MutNode) Rename(ctx context.Context, name string, newParent fs.InodeEmbedder, newName string, flags uint32) syscall.Errno {
+	errno := n.deny(ctx, "")
+	if errno != fs.OK {
+		return errno
+	}
+
+	return n.LoopbackNode.Rename(ctx, name, newParent, newName, flags)
 }
 
 func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
 	if flags&syscall.O_CREAT != 0 {
-		// this is racy, need a lock in n?
 		fs1, flags1, errno1 := n.LoopbackNode.Open(ctx, flags)
 		if errno1 == syscall.ENOENT {
 			return fs1, flags1, errno1
@@ -86,7 +129,11 @@ func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32
 	case flags&syscall.O_TRUNC != 0:
 		fallthrough
 	case flags&syscall.O_RDWR != 0:
-		return nil, 0, syscall.EACCES
+		errno := n.deny(ctx, "")
+		if errno != fs.OK {
+			return nil, 0, errno
+		}
+		return n.LoopbackNode.Open(ctx, flags)
 	}
 
 	// I don't know what 0x8000 is, syscall.O_* doesn't have such a value...
@@ -106,7 +153,7 @@ func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs
 var flagOpts *[]string
 
 func main() {
-	flagOpts = flag.StringSliceP("opt", "o", nil, "options [debug,null,allow_other,ro,log]")
+	flagOpts = flag.StringSliceP("opt", "o", nil, "options [debug,null,allow_other,ro,log,grace=<duration>")
 	flag.Parse()
 	if flag.NArg() < 2 {
 		fmt.Printf("usage: %s oldir newdir\n", path.Base(os.Args[0]))
@@ -139,18 +186,29 @@ func main() {
 	}
 
 	for _, o := range *flagOpts {
-		switch o {
-		case "debug":
+		switch {
+		case o == "debug":
 			opts.Debug = true
-		case "null":
+		case o == "null":
 			opts.NullPermissions = true
-		case "allow_other":
+		case o == "allow_other":
 			opts.AllowOther = true
 			opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
-		case "ro":
+		case o == "ro":
 			opts.MountOptions.Options = append(opts.MountOptions.Options, "ro")
-		case "log":
-			mutnode.(*MutNode).log = true
+		case o == "log":
+			Log = true
+		case strings.HasPrefix(o, "grace="):
+			xs := strings.Split(o, "=")
+			if len(xs) != 2 {
+				log.Fatalf("Wrongly specified grace: %s", o)
+			}
+			d, err := time.ParseDuration(xs[1])
+			if err != nil {
+				log.Fatalf("Wrongly specified grace: %s: %s", o, err)
+			}
+			Grace = d
+
 		}
 	}
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+olddir)
