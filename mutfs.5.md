@@ -30,6 +30,8 @@ Options are:
    * `allow_other`: everyone can access the files.
    * `ro`: make fully read-only.
    * `log`: enable logging when a destructive action is tried.
+   * `linger=<duration>` allow writes on newly created files for this long. Duration is a go-syntax
+      duration. This currently looks at the ctime, as crtime is not supported by FUSE.
 
 Using `mount -t mutfs ~ /tmp/mut -o debug` will use mutfs (*if* the executable (`mount.mutfs`) can
 be found in the path) to mount `~` under `/tmp`.

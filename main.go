@@ -12,6 +12,8 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,9 +25,20 @@ import (
 // Mutfs is a loopback FS node disallowing destructive actions.
 type MutNode struct {
 	fs.LoopbackNode
-
-	log bool
+	sync.RWMutex
+	ctime time.Time
 }
+
+func (n *MutNode) ChangeTime() time.Time {
+	n.RLock()
+	defer n.RUnlock()
+	return n.ctime
+}
+
+var (
+	Log    bool
+	Linger time.Duration
+)
 
 var (
 	_ = (fs.NodeOpener)((*MutNode)(nil))
@@ -34,7 +47,22 @@ var (
 )
 
 func (n *MutNode) deny(ctx context.Context, name string) syscall.Errno {
-	if !n.log {
+	if Linger > 0 {
+		c := n.ChangeTime()
+		if since := time.Since(c); since < Linger {
+			if Log {
+				caller, _ := fuse.FromContext(ctx)
+				if name != "" {
+					log.Printf("Temporary write access allowed for %s %q from pid %d, from %d/%d", Linger-since, name, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
+				} else {
+					log.Printf("Temporary write access allowed for %s from pid %d, from %d/%d", Linger-since, caller.Pid, caller.Owner.Uid, caller.Owner.Gid)
+				}
+			}
+			return fs.OK
+		}
+	}
+
+	if !Log {
 		return syscall.EACCES
 	}
 	caller, ok := fuse.FromContext(ctx)
@@ -49,23 +77,48 @@ func (n *MutNode) deny(ctx context.Context, name string) syscall.Errno {
 	return syscall.EACCES
 }
 
-func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno   { return n.deny(ctx, name) }
-func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno    { return n.deny(ctx, name) }
-func (n *MutNode) Removexattr(ctx context.Context, _ string) syscall.Errno { return n.deny(ctx, "") }
-func (n *MutNode) Setxattr(ctx context.Context, _ string, _ []byte) (uint32, syscall.Errno) {
-	return 0, n.deny(ctx, "")
+func (n *MutNode) Unlink(ctx context.Context, name string) syscall.Errno {
+	err := n.deny(ctx, name)
+	if err != fs.OK {
+		return err
+	}
+	return n.LoopbackNode.Unlink(ctx, name)
 }
 
-func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, _ *fuse.SetAttrIn, _ *fuse.AttrOut) syscall.Errno {
+func (n *MutNode) Rmdir(ctx context.Context, name string) syscall.Errno {
+	err := n.deny(ctx, name)
+	if err != fs.OK {
+		return err
+	}
+	return n.LoopbackNode.Rmdir(ctx, name)
+}
+func (n *MutNode) Removexattr(ctx context.Context, atr string) syscall.Errno { return n.deny(ctx, "") }
+func (n *MutNode) Setxattr(ctx context.Context, attr string, data []byte) (uint32, syscall.Errno) {
+	err := n.deny(ctx, "")
+	if err != fs.OK {
+		return 0, err
+	}
+	return n.Setxattr(ctx, attr, data)
+}
+
+func (n *MutNode) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
 	return n.deny(ctx, "")
 }
 
-func (n *MutNode) Rename(ctx context.Context, name string, _ fs.InodeEmbedder, _ string, _ uint32) syscall.Errno {
+func (n *MutNode) Rename(ctx context.Context, name string, f fs.InodeEmbedder, newName string, flags uint32) syscall.Errno {
 	return n.deny(ctx, name)
 }
 
-func (n *MutNode) Setlkw(ctx context.Context, _ fs.FileHandle, _ uint64, _ *fuse.FileLock, _ uint32) syscall.Errno {
+func (n *MutNode) Setlkw(ctx context.Context, fh fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) syscall.Errno {
 	return n.deny(ctx, "")
+}
+
+func (n *MutNode) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
+	inode, err := n.LoopbackNode.Lookup(ctx, name, out)
+	if err != fs.OK {
+		return inode, err
+	}
+	return inode, err
 }
 
 func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
@@ -99,8 +152,13 @@ func (n *MutNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32
 	return nil, 0, syscall.EACCES
 }
 
-func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, _ *syscall.Stat_t) fs.InodeEmbedder {
-	return &MutNode{LoopbackNode: fs.LoopbackNode{RootData: rootData}}
+func New(rootData *fs.LoopbackRoot, _ *fs.Inode, _ string, stat *syscall.Stat_t) fs.InodeEmbedder {
+	var ctime time.Time
+	if stat != nil {
+		ctime = time.Unix(stat.Ctim.Sec, int64(stat.Ctim.Nsec))
+	}
+	fmt.Printf("%s\n", ctime)
+	return &MutNode{LoopbackNode: fs.LoopbackNode{RootData: rootData}, ctime: ctime}
 }
 
 var flagOpts *[]string
@@ -139,18 +197,29 @@ func main() {
 	}
 
 	for _, o := range *flagOpts {
-		switch o {
-		case "debug":
+		switch {
+		case o == "debug":
 			opts.Debug = true
-		case "null":
+		case o == "null":
 			opts.NullPermissions = true
-		case "allow_other":
+		case o == "allow_other":
 			opts.AllowOther = true
 			opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
-		case "ro":
+		case o == "ro":
 			opts.MountOptions.Options = append(opts.MountOptions.Options, "ro")
-		case "log":
-			mutnode.(*MutNode).log = true
+		case o == "log":
+			Log = true
+		case strings.HasPrefix(o, "linger="):
+			xs := strings.Split(o, "=")
+			if len(xs) != 2 {
+				log.Fatalf("Wrongly specified linger: %s", o)
+			}
+			d, err := time.ParseDuration(xs[1])
+			if err != nil {
+				log.Fatalf("Wrongly specified linger: %s: %s", o, err)
+			}
+			Linger = d
+
 		}
 	}
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+olddir)
